@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
+import { Clase01Controller } from './clase01/clase01.controller';
 
-/**
- * Module 1: documents to credit decisions (Textract, Glue, SageMaker, Clarify).
- * Add one controller per class session under src/modulo1/.
- */
-@Module({})
+@Module({
+  imports: [AuthModule],
+  controllers: [Clase01Controller],
+})
 export class Modulo1Module {}
