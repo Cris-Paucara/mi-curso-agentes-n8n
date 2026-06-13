@@ -517,56 +517,51 @@ for field in ["employee_name", "employer_name", "declared_salary"]:
 
 Observa que con umbral `80`, `employer_name` y `declared_salary` quedan en `None`. Eso no significa que el dato no exista, sino que su confianza es baja. En un sistema real podríamos mandarlo a revisión o bajar el umbral para ciertos campos.
 
-### 3. AWS Glue en cuenta compartida (solo formador)
+### 3. AWS Glue en la cuenta del curso
 
-La cuenta demo del curso (`980921750553`) **no puede crear jobs Glue** (bloqueo a nivel de cuenta AWS). Por eso el **formador** creó el job en otra cuenta AWS (`008428747157`).
+Textract, S3, Glue y NestJS usan la **misma cuenta AWS** (`980921750553`) y las **mismas credenciales** de tu usuario IAM (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`).
 
-**Tú (alumno) no creas el job en consola.** Solo conectas NestJS a esa cuenta con credenciales que te entregará el formador.
+El job `clean-mortgage-credit-file` ya está creado en **us-east-1** (Virginia). **Tú no lo creas en consola** salvo que el formador te lo indique para práctica; tu trabajo es conectar NestJS y ejecutarlo por API.
 
-#### Dos cuentas AWS en esta clase
+#### Una cuenta, un bucket por equipo
 
-| Cuenta | Para qué | Credenciales en `.env` |
-|--------|----------|-------------------------|
-| **Curso** (`980921750553`) | Textract, S3 de documentos, Postgres | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET` |
-| **Glue** (`008428747157`) | Job `clean-mortgage-credit-file`, bucket staging | `GLUE_AWS_ACCESS_KEY_ID`, `GLUE_AWS_SECRET_ACCESS_KEY` |
+| Recurso | Dónde vive | Variable en `.env` |
+|---------|------------|-------------------|
+| Documentos Textract (clases 1–3) | Tu bucket S3 | `AWS_S3_BUCKET` |
+| JSON intermedio y perfil limpio | Mismo bucket, prefijo `clean/credit-files/` | `AWS_S3_CLEAN_PREFIX` |
+| Job Glue de limpieza | Cuenta curso, región Virginia | `AWS_GLUE_CLEAN_JOB_NAME` |
 
-#### Bucket staging (cuenta Glue)
+Ejemplo para `grupo1`:
 
-ARN: `arn:aws:s3:::curso-glue-staging-008428747157-us-east-1`
+| Archivo | Ruta S3 |
+|---------|---------|
+| Input (`extracted-data.json`) | `s3://grupo1-980921750553-us-east-1-an/clean/credit-files/{applicationId}/extracted-data.json` |
+| Output (`clean-profile.json`) | `s3://grupo1-980921750553-us-east-1-an/clean/credit-files/{applicationId}/clean-profile.json` |
 
-Cada equipo tiene su carpeta:
+NestJS sube `extracted-data.json`, Glue escribe `clean-profile.json` en el **mismo bucket** del equipo, y NestJS importa el resultado a Postgres.
 
-| Usuario cuenta curso | Variable `AWS_GLUE_STAGING_PREFIX` | Carpeta en S3 |
-|----------------------|-----------------------------------|---------------|
-| `docente` | `docente` | `docente/{applicationId}/` |
-| `grupo1` | `grupo1` | `grupo1/{applicationId}/` |
-| `grupo2` | `grupo2` | `grupo2/{applicationId}/` |
-| `grupo3` | `grupo3` | `grupo3/{applicationId}/` |
-| `grupo4` | `grupo4` | `grupo4/{applicationId}/` |
+> El prefijo `clean/credit-files` se reutiliza en **Clase 5** como input del job de features.
 
-NestJS sube `extracted-data.json` ahí, Glue escribe `clean-profile.json`, y NestJS importa el resultado a Postgres.
-
-#### Flujo NestJS ↔ Glue (sin consola)
+#### Flujo NestJS ↔ Glue
 
 ```mermaid
 sequenceDiagram
-  participant N as NestJS (cuenta curso)
-  participant S3C as S3 curso
-  participant S3G as S3 staging Glue
+  participant N as NestJS
+  participant S3 as S3 (AWS_S3_BUCKET)
   participant G as Glue job
 
-  N->>S3C: Textract / datos (clases 1–3)
-  N->>S3G: Put extracted-data.json (credenciales GLUE_*)
-  N->>G: StartJobRun (credenciales GLUE_*)
-  G->>S3G: Lee input, escribe clean-profile.json
+  N->>S3: Textract / datos (clases 1–3)
+  N->>S3: Put extracted-data.json
+  N->>G: StartJobRun
+  G->>S3: Lee input, escribe clean-profile.json
   N->>G: GetJobRun (polling)
-  N->>S3G: Get clean-profile.json
+  N->>S3: Get clean-profile.json
   N->>N: Guarda clean_credit_profiles
 ```
 
 El script Python del job es el mismo que probaste localmente; el formador ya lo subió al job `clean-mortgage-credit-file`.
 
-> **Solo formador:** job en Glue Studio (Python Shell), bucket `curso-glue-staging-008428747157-us-east-1`, usuario IAM invocador compartido. Detalle de setup en `guia-docente.md`.
+> **Solo formador:** job en Glue Studio (Python Shell), rol `CursoGlueJobRole`, script en `aws-glue-assets-980921750553-us-east-1`. Detalle de setup en `guia-docente.md`.
 
 El script del job (referencia; ya está desplegado):
 
@@ -795,27 +790,27 @@ write_json(args["BUCKET"], args["OUTPUT_KEY"], {
 })
 ```
 
-Para probarlo manualmente (solo formador, consola Glue), parámetros de ejemplo:
+Para probarlo manualmente (consola Glue), parámetros de ejemplo para `grupo1`:
 
 ```txt
---BUCKET=curso-glue-staging-008428747157-us-east-1
+--BUCKET=grupo1-980921750553-us-east-1-an
 --APPLICATION_ID=APPLICATION_ID
---INPUT_KEY=docente/APPLICATION_ID/extracted-data.json
---OUTPUT_KEY=docente/APPLICATION_ID/clean-profile.json
+--INPUT_KEY=clean/credit-files/APPLICATION_ID/extracted-data.json
+--OUTPUT_KEY=clean/credit-files/APPLICATION_ID/clean-profile.json
 --CONFIDENCE_THRESHOLD=80
 ```
 
-Cambia `docente` por tu `AWS_GLUE_STAGING_PREFIX` (`grupo1`, etc.).
+Usa tu `AWS_S3_BUCKET` como `--BUCKET` y el prefijo `AWS_S3_CLEAN_PREFIX` (`clean/credit-files`).
 
 Luego revisa:
 
-- estado del job en Glue (cuenta `008428747157`);
+- estado del job en Glue (consola, región **us-east-1**);
 - logs en CloudWatch si falla;
-- archivo `clean-profile.json` en el bucket staging si termina correctamente.
+- archivo `clean-profile.json` en tu bucket S3 si termina correctamente.
 
 ### 4. Instala Glue SDK y variables en NestJS
 
-NestJS usa **dos cuentas**: credenciales del curso (Textract/S3) y credenciales Glue (staging + job). No reescribes el script Python; NestJS sube el JSON al staging, lanza el job y consulta el estado.
+NestJS usa **una sola cuenta AWS**: las mismas credenciales que Textract y S3. No reescribes el script Python; NestJS sube el JSON a tu bucket, lanza el job y consulta el estado.
 
 ```bash
 npm install @aws-sdk/client-glue @aws-sdk/client-s3
@@ -824,27 +819,20 @@ npm install @aws-sdk/client-glue @aws-sdk/client-s3
 Agrega a `.env` (mantén las variables de clases anteriores y añade las de Glue):
 
 ```env
-# Cuenta curso (980921750553) — sin cambios
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
-AWS_S3_BUCKET=docente-980921750553-us-east-1-an
+AWS_S3_BUCKET=grupo1-980921750553-us-east-1-an
 
-# Cuenta Glue (008428747157) — te las entrega el formador
-GLUE_AWS_ACCESS_KEY_ID=
-GLUE_AWS_SECRET_ACCESS_KEY=
-AWS_GLUE_REGION=us-east-1
 AWS_GLUE_CLEAN_JOB_NAME=clean-mortgage-credit-file
-AWS_GLUE_STAGING_BUCKET=curso-glue-staging-008428747157-us-east-1
-AWS_GLUE_STAGING_PREFIX=docente
+AWS_S3_CLEAN_PREFIX=clean/credit-files
 ```
 
 | Variable | Descripción |
 |----------|-------------|
-| `GLUE_AWS_*` | Access key del usuario invocador (cuenta Glue) |
-| `AWS_GLUE_STAGING_BUCKET` | Bucket staging: `curso-glue-staging-008428747157-us-east-1` |
-| `AWS_GLUE_STAGING_PREFIX` | Tu carpeta: `docente`, `grupo1`, `grupo2`, `grupo3` o `grupo4` |
+| `AWS_S3_BUCKET` | Tu bucket del curso (documentos, JSON intermedio y perfil limpio) |
 | `AWS_GLUE_CLEAN_JOB_NAME` | Siempre `clean-mortgage-credit-file` |
+| `AWS_S3_CLEAN_PREFIX` | Prefijo S3 para datos limpios: `clean/credit-files` (mismo valor en Clase 5) |
 
 ### 5. Crea la migración
 
@@ -1083,12 +1071,10 @@ export class GlueService {
 
   constructor(private readonly config: ConfigService) {
     this.client = new GlueClient({
-      region: this.config.getOrThrow<string>('AWS_GLUE_REGION'),
+      region: this.config.getOrThrow<string>('AWS_REGION'),
       credentials: {
-        accessKeyId: this.config.getOrThrow<string>('GLUE_AWS_ACCESS_KEY_ID'),
-        secretAccessKey: this.config.getOrThrow<string>(
-          'GLUE_AWS_SECRET_ACCESS_KEY',
-        ),
+        accessKeyId: this.config.getOrThrow<string>('AWS_ACCESS_KEY_ID'),
+        secretAccessKey: this.config.getOrThrow<string>('AWS_SECRET_ACCESS_KEY'),
       },
     });
   }
@@ -1099,14 +1085,12 @@ export class GlueService {
     outputKey: string;
   }) {
     const jobName = this.config.getOrThrow<string>('AWS_GLUE_CLEAN_JOB_NAME');
-    const stagingBucket = this.config.getOrThrow<string>(
-      'AWS_GLUE_STAGING_BUCKET',
-    );
+    const bucket = this.config.getOrThrow<string>('AWS_S3_BUCKET');
 
     const command = new StartJobRunCommand({
       JobName: jobName,
       Arguments: {
-        '--BUCKET': stagingBucket,
+        '--BUCKET': bucket,
         '--APPLICATION_ID': args.applicationId,
         '--INPUT_KEY': args.inputKey,
         '--OUTPUT_KEY': args.outputKey,
@@ -1166,7 +1150,7 @@ type CreateAndCleanCreditFileBody = {
 
 @Injectable()
 export class Clase04Service {
-  private readonly glueS3: S3Client;
+  private readonly s3: S3Client;
 
   constructor(
     private readonly config: ConfigService,
@@ -1179,13 +1163,11 @@ export class Clase04Service {
     @InjectRepository(GlueJobRunEntity)
     private readonly glueRuns: Repository<GlueJobRunEntity>,
   ) {
-    this.glueS3 = new S3Client({
-      region: this.config.getOrThrow<string>('AWS_GLUE_REGION'),
+    this.s3 = new S3Client({
+      region: this.config.getOrThrow<string>('AWS_REGION'),
       credentials: {
-        accessKeyId: this.config.getOrThrow<string>('GLUE_AWS_ACCESS_KEY_ID'),
-        secretAccessKey: this.config.getOrThrow<string>(
-          'GLUE_AWS_SECRET_ACCESS_KEY',
-        ),
+        accessKeyId: this.config.getOrThrow<string>('AWS_ACCESS_KEY_ID'),
+        secretAccessKey: this.config.getOrThrow<string>('AWS_SECRET_ACCESS_KEY'),
       },
     });
   }
@@ -1213,13 +1195,13 @@ export class Clase04Service {
       throw new BadRequestException('Run Clase 3 before cleaning this file');
     }
 
-    const inputKey = this.stagingKey(
+    const inputKey = this.objectKey(
       body.applicationId,
       'extracted-data.json',
     );
-    const outputKey = this.stagingKey(body.applicationId, 'clean-profile.json');
+    const outputKey = this.objectKey(body.applicationId, 'clean-profile.json');
 
-    await this.uploadStagingJson(inputKey, {
+    await this.uploadJson(inputKey, {
       personalData: extracted.personalData,
       employmentData: extracted.employmentData,
       incomeData: extracted.incomeData,
@@ -1251,7 +1233,7 @@ export class Clase04Service {
       applicationId: body.applicationId,
       jobRunId: run.jobRunId,
       status: run.status,
-      stagingBucket: this.config.getOrThrow<string>('AWS_GLUE_STAGING_BUCKET'),
+      bucket: this.config.getOrThrow<string>('AWS_S3_BUCKET'),
       inputKey,
       outputKey,
     };
@@ -1284,15 +1266,15 @@ export class Clase04Service {
     };
   }
 
-  private stagingKey(applicationId: string, fileName: string) {
-    const prefix = this.config.getOrThrow<string>('AWS_GLUE_STAGING_PREFIX');
+  private objectKey(applicationId: string, fileName: string) {
+    const prefix = this.config.getOrThrow<string>('AWS_S3_CLEAN_PREFIX');
     return `${prefix}/${applicationId}/${fileName}`;
   }
 
-  private async uploadStagingJson(key: string, data: unknown) {
-    await this.glueS3.send(
+  private async uploadJson(key: string, data: unknown) {
+    await this.s3.send(
       new PutObjectCommand({
-        Bucket: this.config.getOrThrow<string>('AWS_GLUE_STAGING_BUCKET'),
+        Bucket: this.config.getOrThrow<string>('AWS_S3_BUCKET'),
         Key: key,
         Body: JSON.stringify(data),
         ContentType: 'application/json',
@@ -1301,9 +1283,9 @@ export class Clase04Service {
   }
 
   private async importCleanProfile(applicationId: string, key: string) {
-    const response = await this.glueS3.send(
+    const response = await this.s3.send(
       new GetObjectCommand({
-        Bucket: this.config.getOrThrow<string>('AWS_GLUE_STAGING_BUCKET'),
+        Bucket: this.config.getOrThrow<string>('AWS_S3_BUCKET'),
         Key: key,
       }),
     );
@@ -1456,7 +1438,7 @@ curl http://localhost:3000/modulo1/clase04/credit-files/APPLICATION_ID/clean-sta
 ### 12. Entrega
 
 - Evidencia de `clean-status` con `SUCCEEDED`.
-- Evidencia del archivo `clean-profile.json` en S3 staging (`curso-glue-staging-…/{tu-prefix}/`).
+- Evidencia del archivo `clean-profile.json` en tu bucket S3 (`AWS_S3_BUCKET`, prefijo `AWS_S3_CLEAN_PREFIX`).
 - Evidencia del registro en `clean_credit_profiles`.
 - Evidencia del endpoint unificado creando el expediente.
 - Explica 3 campos que Glue normalizó.

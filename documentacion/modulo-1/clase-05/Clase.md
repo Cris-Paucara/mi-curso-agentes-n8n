@@ -1,40 +1,472 @@
-# Clase 5: AWS Glue para feature engineering crediticio
+# Clase 5: IA, Machine Learning y variables para modelos crediticios
 
 | | |
 |---|---|
 | **Clase** | 5 de 11 |
 | **Duración** | 3 horas |
-| **Controlador** | `Clase05Controller` |
-| **Endpoints** | `POST /modulo1/clase05/credit-files/features`, `GET /modulo1/clase05/credit-files/:applicationId/features-status`, `GET /modulo1/clase05/credit-files/:applicationId/features` |
+| **Tema principal** | De datos limpios a variables listas para modelos |
+| **Práctica** | Feature engineering con Glue |
+| **Endpoints objetivo** | `POST /modulo1/clase05/credit-files/features`, `GET /modulo1/clase05/credit-files/:applicationId/features-status`, `GET /modulo1/clase05/credit-files/:applicationId/features` |
 
 ## Objetivos
 
 Al terminar esta sesión podrás:
 
-- Explicar qué es feature engineering en evaluación crediticia.
-- Usar AWS Glue para generar variables derivadas.
-- Crear un dataset de features para futuros modelos.
-- Guardar las variables del file en Postgres/Supabase.
-- Preparar el camino para entrenamiento con SageMaker.
+- Explicar con palabras simples qué es inteligencia artificial.
+- Diferenciar inteligencia artificial, machine learning, redes neuronales y LLMs.
+- Entender cómo aprende un modelo clásico de machine learning.
+- Probar un ejemplo pequeño de regresión logística en un notebook.
+- Entender por qué necesitamos crear variables numéricas antes de entrenar modelos.
+- Generar variables crediticias desde el perfil limpio de Clase 4.
 
 ---
 
 ## Parte teórica
 
-### De perfil limpio a variables
+### 1. Qué es inteligencia artificial
 
-Clase 4 produjo datos limpios:
+Inteligencia artificial, o IA, es una forma de construir sistemas que hacen tareas que normalmente asociamos con inteligencia humana.
 
-```json
-{
-  "net_monthly_income": 8500,
-  "monthly_debt_payment": 1800,
-  "requested_amount": 450000,
-  "property_value": 600000
-}
+No significa que la computadora "piense" como una persona. Significa que puede resolver tareas como:
+
+- reconocer una imagen;
+- leer un documento;
+- responder una pregunta;
+- clasificar un correo como spam;
+- recomendar una película;
+- estimar el riesgo de una solicitud de crédito.
+
+Un ejemplo muy simple:
+
+```txt
+Entrada: "Este correo promete dinero fácil y pide hacer clic"
+Sistema: detecta patrones sospechosos
+Salida: "Probablemente es spam"
 ```
 
-Clase 5 crea señales para modelos:
+Otro ejemplo:
+
+```txt
+Entrada: foto de una cédula
+Sistema: detecta texto y campos importantes
+Salida: nombre, número de documento, fecha de nacimiento
+```
+
+En nuestro curso ya usamos IA desde la Clase 1, aunque todavía no la llamamos así todo el tiempo:
+
+```mermaid
+flowchart LR
+  A["Documento PDF o imagen"] --> B["Amazon Textract"]
+  B --> C["Texto y campos extraídos"]
+  C --> D["Datos para nuestro backend"]
+```
+
+Textract usa modelos de IA para leer documentos. Nosotros lo usamos como una pieza dentro de una aplicación NestJS.
+
+### IA no es una sola cosa
+
+La IA es un paraguas grande. Dentro de ese paraguas hay varias familias.
+
+```mermaid
+flowchart TD
+  A["Inteligencia Artificial"] --> B["Reglas programadas"]
+  A --> C["Machine Learning"]
+  C --> D["Modelos clásicos"]
+  C --> E["Redes neuronales"]
+  E --> F["Deep Learning"]
+  F --> G["LLMs"]
+```
+
+Ejemplos:
+
+| Tipo | Qué hace | Ejemplo |
+|------|----------|---------|
+| Reglas programadas | Sigue condiciones escritas por una persona | Si deuda/ingreso > 0.5, marcar alerta |
+| Machine learning | Aprende patrones desde datos | Predecir riesgo usando expedientes históricos |
+| Redes neuronales | Aprende patrones más complejos con muchas capas | Reconocer imágenes o voz |
+| LLMs | Modelos de lenguaje entrenados con muchísimo texto | ChatGPT, Claude, Gemini |
+
+---
+
+## 2. Qué es machine learning
+
+Machine learning significa aprendizaje automático.
+
+La idea central es:
+
+> En vez de escribir todas las reglas a mano, mostramos ejemplos y el modelo aprende patrones.
+
+### Ejemplo con reglas escritas a mano
+
+Podríamos escribir una regla así:
+
+```txt
+Si deuda mensual / ingreso mensual > 0.45:
+  riesgo alto
+Si no:
+  riesgo bajo
+```
+
+Eso es simple y explicable, pero también limitado. La realidad suele depender de muchas variables al mismo tiempo:
+
+- ingreso mensual;
+- deuda mensual;
+- valor del inmueble;
+- monto solicitado;
+- historial de pagos;
+- estabilidad laboral;
+- saldo promedio;
+- plazo del crédito.
+
+### Ejemplo con machine learning
+
+Con machine learning hacemos algo distinto:
+
+```txt
+Le damos al modelo muchos ejemplos históricos:
+
+Cliente A: ingreso 8500, deuda 1800, mora no, riesgo bajo
+Cliente B: ingreso 4000, deuda 2500, mora sí, riesgo alto
+Cliente C: ingreso 12000, deuda 1000, mora no, riesgo bajo
+
+El modelo aprende una relación entre variables y resultado.
+```
+
+Después usamos el modelo con un caso nuevo:
+
+```txt
+Cliente nuevo: ingreso 7000, deuda 2600, mora no
+Modelo: probabilidad de riesgo = 0.38
+```
+
+### Cómo aprende un modelo, explicado sin fórmulas difíciles
+
+Un modelo aprende probando una regla interna, comparando su respuesta con la respuesta correcta y ajustándose.
+
+```mermaid
+flowchart LR
+  A["Datos históricos"] --> B["Modelo"]
+  B --> C["Predicción"]
+  C --> D["Comparar con respuesta real"]
+  D --> E["Ajustar el modelo"]
+  E --> B
+```
+
+Ejemplo:
+
+```txt
+El modelo predice: riesgo bajo
+El dato real dice: riesgo alto
+Entonces el modelo se corrige un poco.
+```
+
+Ese proceso se repite muchas veces.
+
+### Redes neuronales y machine learning
+
+Sí, las redes neuronales entran dentro de machine learning.
+
+Una red neuronal es un tipo de modelo que aprende combinando muchas operaciones pequeñas. Se inspira de forma muy general en la idea de neuronas, pero en la práctica es matemática y código.
+
+```mermaid
+flowchart LR
+  A["Variables de entrada"] --> B["Capa 1"]
+  B --> C["Capa 2"]
+  C --> D["Salida"]
+```
+
+Las redes neuronales son útiles cuando los patrones son muy complejos, por ejemplo:
+
+- imágenes;
+- audio;
+- lenguaje natural;
+- traducción;
+- generación de texto.
+
+Para nuestro caso crediticio inicial no necesitamos empezar con redes neuronales. Primero usaremos modelos clásicos porque son más simples de entender, entrenar y explicar.
+
+### Diferencia entre machine learning y LLMs
+
+Un LLM, o Large Language Model, es un modelo de lenguaje muy grande. ChatGPT es un ejemplo.
+
+Los LLMs también son machine learning, pero pertenecen a una familia más específica:
+
+```txt
+IA
+└── Machine Learning
+    └── Deep Learning
+        └── Modelos de lenguaje grandes (LLMs)
+```
+
+La diferencia práctica:
+
+| Tema | Modelo clásico de ML | LLM |
+|------|----------------------|-----|
+| Entrada típica | Tabla de números | Texto |
+| Ejemplo de entrada | `debt_to_income_ratio = 0.21` | "Resume este contrato" |
+| Salida típica | número, clase, probabilidad | texto, explicación, respuesta |
+| Uso en el curso | riesgo y monto recomendado | explicación y asistentes en módulo posterior |
+| Ventaja | rápido, barato, explicable | muy flexible con lenguaje |
+| Riesgo | necesita buenas variables | puede inventar si no se controla |
+
+En este módulo vamos a empezar con modelos clásicos porque nuestro problema principal es tabular:
+
+```txt
+Una fila por solicitud de crédito.
+Varias columnas numéricas.
+Una salida esperada.
+```
+
+---
+
+## 3. Modelos clásicos de machine learning
+
+Los modelos clásicos trabajan muy bien con tablas.
+
+Ejemplo de tabla:
+
+| Solicitud | Ingreso | Deuda | LTV | Historial | Resultado |
+|-----------|---------|-------|-----|-----------|-----------|
+| A | 8500 | 1800 | 0.75 | 80 | Bajo riesgo |
+| B | 4000 | 2500 | 0.92 | 45 | Alto riesgo |
+| C | 12000 | 1000 | 0.55 | 95 | Bajo riesgo |
+
+Un modelo no ve "historias". Ve columnas.
+
+### Regresión logística
+
+La regresión logística se usa para clasificación.
+
+Responde preguntas como:
+
+```txt
+¿Este cliente tiene alto riesgo?
+Sí o no.
+```
+
+Pero normalmente devuelve algo más útil que un sí/no:
+
+```txt
+Probabilidad de alto riesgo = 0.27
+```
+
+Si la probabilidad es mayor que cierto umbral, por ejemplo 0.50, se clasifica como alto riesgo.
+
+```mermaid
+flowchart LR
+  A["Variables crediticias"] --> B["Regresión logística"]
+  B --> C["Probabilidad de riesgo"]
+  C --> D["Riesgo bajo o alto"]
+```
+
+### Regresión lineal
+
+La regresión lineal predice un número continuo.
+
+Ejemplos:
+
+- precio estimado de una casa;
+- gasto esperado;
+- monto recomendado.
+
+```txt
+Entrada: ingreso, deuda, valor del inmueble
+Salida: monto recomendado = 320000
+```
+
+### Árbol de decisión
+
+Un árbol de decisión parece una serie de preguntas.
+
+```mermaid
+flowchart TD
+  A["¿DTI > 0.45?"] -->|Sí| B["Más riesgo"]
+  A -->|No| C["¿Historial < 60?"]
+  C -->|Sí| D["Riesgo medio"]
+  C -->|No| E["Menor riesgo"]
+```
+
+Es fácil de explicar, aunque puede quedarse corto si el problema es complejo.
+
+### Random Forest
+
+Random Forest usa muchos árboles y combina sus respuestas.
+
+```txt
+Árbol 1: riesgo bajo
+Árbol 2: riesgo alto
+Árbol 3: riesgo bajo
+Resultado final: riesgo bajo
+```
+
+Suele ser más estable que un solo árbol.
+
+### XGBoost
+
+XGBoost también usa árboles, pero los entrena de forma secuencial. Cada nuevo árbol intenta corregir errores de los anteriores.
+
+```mermaid
+flowchart LR
+  A["Árbol 1"] --> B["Errores"]
+  B --> C["Árbol 2 corrige"]
+  C --> D["Errores restantes"]
+  D --> E["Árbol 3 corrige"]
+  E --> F["Predicción final"]
+```
+
+Es muy usado en problemas tabulares porque suele funcionar muy bien con datos estructurados.
+
+### Los dos modelos que veremos en el curso
+
+En el curso usaremos dos modelos porque queremos responder dos preguntas diferentes.
+
+| Modelo | Tipo | Pregunta | Salida |
+|--------|------|----------|--------|
+| Regresión logística | Clasificación | ¿Cuál es el riesgo de incumplimiento? | probabilidad de riesgo y etiqueta `default_flag` |
+| XGBoost | Regresión | ¿Qué monto sería razonable recomendar? | `recommended_amount` |
+
+No usamos un solo modelo porque las salidas son distintas.
+
+```txt
+Riesgo: categoría o probabilidad.
+Monto recomendado: número.
+```
+
+---
+
+## 4. Ejemplo pequeño en notebook: regresión logística
+
+Antes de conectar todo con AWS, haremos un ejemplo mínimo en un notebook. La idea no es crear un modelo bancario real. La idea es ver cómo se entrena un modelo en pocos pasos.
+
+Puedes usar Jupyter Notebook, Google Colab o VS Code con notebooks.
+
+Si tu entorno no tiene las librerías instaladas, ejecuta primero:
+
+```python
+%pip install pandas scikit-learn
+```
+
+### Celda 1: crear datos de ejemplo
+
+```python
+import pandas as pd
+
+data = pd.DataFrame([
+    {
+        "debt_to_income_ratio": 0.21,
+        "loan_to_value_ratio": 0.75,
+        "payment_to_income_ratio": 0.35,
+        "credit_history_score": 80,
+        "high_risk": 0,
+    },
+    {
+        "debt_to_income_ratio": 0.62,
+        "loan_to_value_ratio": 0.93,
+        "payment_to_income_ratio": 0.55,
+        "credit_history_score": 45,
+        "high_risk": 1,
+    },
+    {
+        "debt_to_income_ratio": 0.18,
+        "loan_to_value_ratio": 0.60,
+        "payment_to_income_ratio": 0.22,
+        "credit_history_score": 95,
+        "high_risk": 0,
+    },
+    {
+        "debt_to_income_ratio": 0.48,
+        "loan_to_value_ratio": 0.88,
+        "payment_to_income_ratio": 0.44,
+        "credit_history_score": 55,
+        "high_risk": 1,
+    },
+    {
+        "debt_to_income_ratio": 0.30,
+        "loan_to_value_ratio": 0.70,
+        "payment_to_income_ratio": 0.28,
+        "credit_history_score": 75,
+        "high_risk": 0,
+    },
+    {
+        "debt_to_income_ratio": 0.58,
+        "loan_to_value_ratio": 0.96,
+        "payment_to_income_ratio": 0.61,
+        "credit_history_score": 35,
+        "high_risk": 1,
+    },
+])
+
+data
+```
+
+### Celda 2: separar variables y respuesta
+
+```python
+features = [
+    "debt_to_income_ratio",
+    "loan_to_value_ratio",
+    "payment_to_income_ratio",
+    "credit_history_score",
+]
+
+X = data[features]
+y = data["high_risk"]
+```
+
+`X` contiene las variables que el modelo usará para aprender. `y` contiene la respuesta que queremos que aprenda.
+
+### Celda 3: entrenar el modelo
+
+```python
+from sklearn.linear_model import LogisticRegression
+
+model = LogisticRegression()
+model.fit(X, y)
+```
+
+En esta línea ocurre el entrenamiento:
+
+```python
+model.fit(X, y)
+```
+
+El modelo mira los ejemplos y aprende una relación entre variables y riesgo.
+
+### Celda 4: probar un cliente nuevo
+
+```python
+new_application = pd.DataFrame([
+    {
+        "debt_to_income_ratio": 0.2118,
+        "loan_to_value_ratio": 0.75,
+        "payment_to_income_ratio": 0.3529,
+        "credit_history_score": 80,
+    }
+])
+
+risk_probability = model.predict_proba(new_application)[0][1]
+risk_label = model.predict(new_application)[0]
+
+print("Risk probability:", round(risk_probability, 4))
+print("High risk label:", risk_label)
+```
+
+El resultado puede ser algo parecido a:
+
+```txt
+Risk probability: 0.28
+High risk label: 0
+```
+
+Esto significa:
+
+```txt
+Según este modelo pequeño, el caso parece de menor riesgo.
+```
+
+### Por qué este ejemplo es importante
+
+El modelo no recibió el PDF, ni el nombre del cliente, ni textos largos. Recibió variables numéricas:
 
 ```json
 {
@@ -45,34 +477,85 @@ Clase 5 crea señales para modelos:
 }
 ```
 
-### Variables del curso
+Por eso Clase 5 es tan importante: convierte un perfil limpio en una fila que un modelo puede usar.
 
-| Variable | Qué representa |
-|----------|----------------|
-| `debt_to_income_ratio` | Cuánto de su ingreso ya está comprometido en deudas |
-| `loan_to_value_ratio` | Relación entre monto solicitado y valor del inmueble |
-| `payment_to_income_ratio` | Cuota estimada del crédito vs ingreso |
-| `employment_stability_score` | Señal simple de estabilidad laboral |
-| `banking_capacity_score` | Señal simple basada en saldo promedio |
-| `credit_history_score` | Penalización por mora y deudas activas |
+```mermaid
+flowchart LR
+  A["PDF"] --> B["Textract"]
+  B --> C["Datos extraídos"]
+  C --> D["Limpieza"]
+  D --> E["Variables numéricas"]
+  E --> F["Modelo ML"]
+  F --> G["Predicción"]
+```
 
-Estas reglas son sintéticas y explicables. No representan una política bancaria real.
+---
 
-### Por qué seguimos con Glue
+## 5. Variables listas para nuestro modelo
 
-Clase 4 usó Glue para limpiar. Clase 5 usa Glue para transformar datos limpios en variables.
+En Clase 4 terminamos con un perfil limpio:
+
+```json
+{
+  "net_monthly_income": 8500,
+  "monthly_debt_payment": 1800,
+  "requested_amount": 450000,
+  "property_value": 600000,
+  "estimated_monthly_payment": 3000,
+  "active_loan_count": 2,
+  "has_late_payments": false
+}
+```
+
+En Clase 5 queremos generar variables como estas:
+
+```json
+{
+  "debt_to_income_ratio": 0.2118,
+  "loan_to_value_ratio": 0.75,
+  "payment_to_income_ratio": 0.3529,
+  "credit_history_score": 80
+}
+```
+
+### Qué significa cada variable
+
+| Variable | Fórmula simple | Interpretación |
+|----------|----------------|----------------|
+| `debt_to_income_ratio` | deuda mensual / ingreso mensual | Qué parte del ingreso ya está comprometida |
+| `loan_to_value_ratio` | monto solicitado / valor del inmueble | Qué porcentaje del inmueble se financia |
+| `payment_to_income_ratio` | cuota estimada / ingreso mensual | Qué parte del ingreso se iría a la nueva cuota |
+| `credit_history_score` | puntaje sintético desde mora y créditos activos | Señal simple de historial |
+
+Ejemplo:
+
+```txt
+debt_to_income_ratio = 1800 / 8500 = 0.2118
+loan_to_value_ratio = 450000 / 600000 = 0.75
+payment_to_income_ratio = 3000 / 8500 = 0.3529
+```
+
+Estas variables son mejores para un modelo porque:
+
+- son numéricas;
+- tienen significado de negocio;
+- resumen información importante;
+- permiten comparar solicitudes de distinto tamaño;
+- serán usadas por los modelos de riesgo y monto recomendado.
+
+---
+
+## Parte práctica: crear variables listas para el modelo
+
+La parte práctica continúa el pipeline de Clase 4.
 
 ```mermaid
 flowchart LR
   A["clean_credit_profiles"] --> B["JSON limpio en S3"]
   B --> C["Glue Feature Job"]
-  C --> D["features JSON en S3"]
+  C --> D["features.json en S3"]
   D --> E["credit_feature_sets"]
 ```
-
----
-
-## Parte práctica
 
 ### 1. Crea la migración
 
@@ -196,7 +679,7 @@ AWS_S3_FEATURES_PREFIX=features/credit-files
 
 ### 4. Script Glue de features
 
-En Glue crea un job Spark o Python Shell llamado `features-mortgage-credit-file`. Para laboratorio puedes usar Python Shell:
+En Glue crea un job Python Shell llamado `features-mortgage-credit-file`.
 
 ```python
 import json
@@ -533,6 +1016,8 @@ Mantén también `GlueService`, `GlueJobRunEntity` y `CleanCreditProfile`, porqu
 
 ### 9. Prueba
 
+Primero debes tener una solicitud con limpieza terminada desde Clase 4.
+
 ```bash
 curl -X POST http://localhost:3000/modulo1/clase05/credit-files/features \
   -H "Content-Type: application/json" \
@@ -557,16 +1042,27 @@ curl http://localhost:3000/modulo1/clase05/credit-files/APPLICATION_ID/features 
   -H "x-api-secret: pass1"
 ```
 
+La respuesta debe incluir variables como:
+
+```json
+{
+  "debtToIncomeRatio": "0.2118",
+  "loanToValueRatio": "0.7500",
+  "paymentToIncomeRatio": "0.3529",
+  "creditHistoryScore": "80.00"
+}
+```
+
 ### 10. Entrega
 
 - Captura del job de features `SUCCEEDED`.
 - Evidencia de registro en `credit_feature_sets`.
-- Explica las variables `debt_to_income_ratio`, `loan_to_value_ratio` y `credit_history_score`.
-- Explica por qué `synthetic_risk_label` no representa una política bancaria real.
+- Explicación simple de `debt_to_income_ratio`, `loan_to_value_ratio` y `credit_history_score`.
+- Explicación de por qué `synthetic_risk_label` es didáctica y no una política bancaria real.
 
 ## Recursos
 
 - [AWS Glue](https://docs.aws.amazon.com/glue/latest/dg/what-is-glue.html)
 - [Glue Python Shell jobs](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-python.html)
-- [Feature engineering](https://docs.aws.amazon.com/sagemaker/latest/dg/feature-store.html)
 - [Machine learning terminology](https://developers.google.com/machine-learning/glossary)
+- [Scikit-learn Logistic Regression](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html)
