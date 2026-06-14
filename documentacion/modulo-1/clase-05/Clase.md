@@ -334,9 +334,15 @@ Monto recomendado: número.
 
 ---
 
-## 4. Ejemplo pequeño en notebook: regresión logística
+## 4. Ejemplo pequeño en notebook: ¿llevar paraguas?
 
-Antes de conectar todo con AWS, haremos un ejemplo mínimo en un notebook. La idea no es crear un modelo bancario real. La idea es ver cómo se entrena un modelo en pocos pasos.
+Antes de conectar todo con crédito y AWS, haremos un ejemplo mínimo de la vida diaria. La pregunta será:
+
+```txt
+¿Debería llevar paraguas?
+```
+
+Este ejemplo sirve porque todos entendemos la intuición: si hay mucha probabilidad de lluvia, humedad alta, mucha nubosidad y poco sol, probablemente conviene llevar paraguas.
 
 Puedes usar Jupyter Notebook, Google Colab o VS Code con notebooks.
 
@@ -353,46 +359,52 @@ import pandas as pd
 
 data = pd.DataFrame([
     {
-        "debt_to_income_ratio": 0.21,
-        "loan_to_value_ratio": 0.75,
-        "payment_to_income_ratio": 0.35,
-        "credit_history_score": 80,
-        "high_risk": 0,
+        "rain_probability": 0.10,
+        "humidity": 0.35,
+        "cloudiness": 0.20,
+        "wind_speed": 5,
+        "is_rainy_season": 0,
+        "take_umbrella": 0,
     },
     {
-        "debt_to_income_ratio": 0.62,
-        "loan_to_value_ratio": 0.93,
-        "payment_to_income_ratio": 0.55,
-        "credit_history_score": 45,
-        "high_risk": 1,
+        "rain_probability": 0.85,
+        "humidity": 0.88,
+        "cloudiness": 0.95,
+        "wind_speed": 18,
+        "is_rainy_season": 1,
+        "take_umbrella": 1,
     },
     {
-        "debt_to_income_ratio": 0.18,
-        "loan_to_value_ratio": 0.60,
-        "payment_to_income_ratio": 0.22,
-        "credit_history_score": 95,
-        "high_risk": 0,
+        "rain_probability": 0.25,
+        "humidity": 0.40,
+        "cloudiness": 0.30,
+        "wind_speed": 8,
+        "is_rainy_season": 0,
+        "take_umbrella": 0,
     },
     {
-        "debt_to_income_ratio": 0.48,
-        "loan_to_value_ratio": 0.88,
-        "payment_to_income_ratio": 0.44,
-        "credit_history_score": 55,
-        "high_risk": 1,
+        "rain_probability": 0.70,
+        "humidity": 0.78,
+        "cloudiness": 0.80,
+        "wind_speed": 14,
+        "is_rainy_season": 1,
+        "take_umbrella": 1,
     },
     {
-        "debt_to_income_ratio": 0.30,
-        "loan_to_value_ratio": 0.70,
-        "payment_to_income_ratio": 0.28,
-        "credit_history_score": 75,
-        "high_risk": 0,
+        "rain_probability": 0.45,
+        "humidity": 0.65,
+        "cloudiness": 0.60,
+        "wind_speed": 10,
+        "is_rainy_season": 0,
+        "take_umbrella": 0,
     },
     {
-        "debt_to_income_ratio": 0.58,
-        "loan_to_value_ratio": 0.96,
-        "payment_to_income_ratio": 0.61,
-        "credit_history_score": 35,
-        "high_risk": 1,
+        "rain_probability": 0.60,
+        "humidity": 0.82,
+        "cloudiness": 0.75,
+        "wind_speed": 22,
+        "is_rainy_season": 1,
+        "take_umbrella": 1,
     },
 ])
 
@@ -403,14 +415,15 @@ data
 
 ```python
 features = [
-    "debt_to_income_ratio",
-    "loan_to_value_ratio",
-    "payment_to_income_ratio",
-    "credit_history_score",
+    "rain_probability",
+    "humidity",
+    "cloudiness",
+    "wind_speed",
+    "is_rainy_season",
 ]
 
 X = data[features]
-y = data["high_risk"]
+y = data["take_umbrella"]
 ```
 
 `X` contiene las variables que el modelo usará para aprender. `y` contiene la respuesta que queremos que aprenda.
@@ -430,51 +443,60 @@ En esta línea ocurre el entrenamiento:
 model.fit(X, y)
 ```
 
-El modelo mira los ejemplos y aprende una relación entre variables y riesgo.
+El modelo mira los ejemplos y aprende una relación entre clima y decisión.
 
-### Celda 4: probar un cliente nuevo
+### Celda 4: probar un día nuevo
 
 ```python
-new_application = pd.DataFrame([
+new_day = pd.DataFrame([
     {
-        "debt_to_income_ratio": 0.2118,
-        "loan_to_value_ratio": 0.75,
-        "payment_to_income_ratio": 0.3529,
-        "credit_history_score": 80,
+        "rain_probability": 0.80,
+        "humidity": 0.75,
+        "cloudiness": 0.90,
+        "wind_speed": 12,
+        "is_rainy_season": 1,
     }
 ])
 
-risk_probability = model.predict_proba(new_application)[0][1]
-risk_label = model.predict(new_application)[0]
+umbrella_probability = model.predict_proba(new_day)[0][1]
+umbrella_label = model.predict(new_day)[0]
 
-print("Risk probability:", round(risk_probability, 4))
-print("High risk label:", risk_label)
+print("Umbrella probability:", round(umbrella_probability, 4))
+print("Take umbrella label:", umbrella_label)
 ```
 
 El resultado puede ser algo parecido a:
 
 ```txt
-Risk probability: 0.28
-High risk label: 0
+Umbrella probability: 0.76
+Take umbrella label: 1
 ```
 
 Esto significa:
 
 ```txt
-Según este modelo pequeño, el caso parece de menor riesgo.
+Según este modelo pequeño, conviene llevar paraguas.
 ```
 
 ### Por qué este ejemplo es importante
 
-El modelo no recibió el PDF, ni el nombre del cliente, ni textos largos. Recibió variables numéricas:
+El modelo no recibió una explicación escrita como "parece que va a llover". Recibió variables numéricas:
 
 ```json
 {
-  "debt_to_income_ratio": 0.2118,
-  "loan_to_value_ratio": 0.75,
-  "payment_to_income_ratio": 0.3529,
-  "credit_history_score": 80
+  "rain_probability": 0.80,
+  "humidity": 0.75,
+  "cloudiness": 0.90,
+  "wind_speed": 12,
+  "is_rainy_season": 1
 }
+```
+
+La idea es la misma que usaremos después con crédito:
+
+```txt
+Clima -> variables numéricas -> modelo -> llevar paraguas sí/no
+Crédito -> variables numéricas -> modelo -> riesgo alto sí/no
 ```
 
 Por eso Clase 5 es tan importante: convierte un perfil limpio en una fila que un modelo puede usar.
