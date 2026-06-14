@@ -5,7 +5,7 @@
 | **Clase** | 5 de 11 |
 | **Duración** | 3 horas |
 | **Tema principal** | De datos limpios a variables listas para modelos |
-| **Práctica** | Feature engineering con Glue |
+| **Práctica** | Notebook local con Docker y feature engineering con Glue |
 | **Endpoints objetivo** | `POST /modulo1/clase05/credit-files/features`, `GET /modulo1/clase05/credit-files/:applicationId/features-status`, `GET /modulo1/clase05/credit-files/:applicationId/features` |
 
 ## Objetivos
@@ -15,7 +15,7 @@ Al terminar esta sesión podrás:
 - Explicar con palabras simples qué es inteligencia artificial.
 - Diferenciar inteligencia artificial, machine learning, redes neuronales y LLMs.
 - Entender cómo aprende un modelo clásico de machine learning.
-- Probar un ejemplo pequeño de regresión logística en un notebook.
+- Probar un ejemplo pequeño de regresión logística en un notebook local con Docker.
 - Entender por qué necesitamos crear variables numéricas antes de entrenar modelos.
 - Generar variables crediticias desde el perfil limpio de Clase 4.
 
@@ -334,25 +334,101 @@ Monto recomendado: número.
 
 ---
 
-## 4. Ejemplo pequeño en notebook: ¿llevar paraguas?
+## 4. Ejemplo pequeño en notebook local: ¿llevar paraguas?
 
-Antes de conectar todo con crédito y AWS, haremos un ejemplo mínimo de la vida diaria. La pregunta será:
+Antes de conectar todo con crédito y AWS, haremos un ejemplo mínimo de la vida diaria en un notebook local usando **Docker**. La pregunta será:
 
 ```txt
 ¿Debería llevar paraguas?
 ```
 
-Este ejemplo sirve porque todos entendemos la intuición: si hay mucha probabilidad de lluvia, humedad alta, mucha nubosidad y poco sol, probablemente conviene llevar paraguas.
+Este ejemplo sirve porque todos entendemos la intuición: si hay mucha probabilidad de lluvia, humedad alta, mucha nubosidad y viento, probablemente conviene llevar paraguas.
 
-Puedes usar Jupyter Notebook, Google Colab o VS Code con notebooks.
+### Qué vamos a usar
 
-Si tu entorno no tiene las librerías instaladas, ejecuta primero:
+Usaremos una imagen de Docker que ya trae Python, JupyterLab y librerías de ciencia de datos.
 
-```python
-%pip install pandas scikit-learn
+```txt
+Docker -> contenedor con JupyterLab -> notebook Python -> modelo de prueba
 ```
 
-### Celda 1: crear datos de ejemplo
+No necesitas instalar Python, pandas ni scikit-learn en tu computadora. Todo vendrá dentro del contenedor.
+
+### Paso 1: abrir una terminal
+
+Abre una terminal en la carpeta del curso.
+
+En macOS o Linux puedes usar Terminal. En Windows puedes usar PowerShell o la terminal de VS Code.
+
+Para confirmar que Docker está disponible, ejecuta:
+
+```bash
+docker --version
+```
+
+Deberías ver algo parecido a:
+
+```txt
+Docker version 27.x.x
+```
+
+Si ese comando no responde, avisa al docente antes de continuar.
+
+### Paso 2: descargar y ejecutar JupyterLab
+
+Copia y ejecuta este comando:
+
+```bash
+docker run --rm -p 8888:8888 -v "$PWD":/home/jovyan/work quay.io/jupyter/scipy-notebook:latest
+```
+
+Qué significa cada parte:
+
+| Parte | Significado |
+|-------|-------------|
+| `docker run` | Crea y ejecuta un contenedor |
+| `--rm` | Borra el contenedor cuando lo apagues |
+| `-p 8888:8888` | Conecta el puerto de Jupyter con tu navegador |
+| `-v "$PWD":/home/jovyan/work` | Comparte tu carpeta actual con el contenedor |
+| `quay.io/jupyter/scipy-notebook:latest` | Imagen que trae JupyterLab, pandas y scikit-learn |
+
+La primera vez puede tardar porque Docker debe descargar la imagen.
+
+### Paso 3: abrir JupyterLab en el navegador
+
+Cuando el contenedor termine de iniciar, la terminal mostrará una URL parecida a esta:
+
+```txt
+http://127.0.0.1:8888/lab?token=xxxxxxxx
+```
+
+Copia esa URL completa y ábrela en tu navegador.
+
+> El `token` es una clave temporal para entrar a tu JupyterLab local.
+
+### Paso 4: crear el notebook
+
+Dentro de JupyterLab:
+
+1. En el panel izquierdo, entra a la carpeta `work`.
+2. Haz clic en **Python 3 (ipykernel)** para crear un notebook.
+3. Guarda el notebook con este nombre:
+
+```txt
+clase-05-paraguas.ipynb
+```
+
+4. Ejecuta primero una celda simple:
+
+```python
+print("hola")
+```
+
+Para correr una celda puedes usar `Shift + Enter` o el botón de play.
+
+Si aparece `hola`, el notebook está listo.
+
+### Celda 1: crear datos de ejemplo en el notebook
 
 ```python
 import pandas as pd
@@ -509,6 +585,22 @@ flowchart LR
   D --> E["Variables numéricas"]
   E --> F["Modelo ML"]
   F --> G["Predicción"]
+```
+
+### Paso 5: apagar JupyterLab al terminar
+
+Cuando termines la práctica, vuelve a la terminal donde está corriendo Docker y presiona:
+
+```txt
+Ctrl + C
+```
+
+Docker preguntará si quieres detener el servidor. Confirma con `y` si aparece la pregunta.
+
+Como usamos `--rm`, el contenedor se elimina al apagarse. El notebook queda guardado en tu carpeta del curso porque usamos:
+
+```bash
+-v "$PWD":/home/jovyan/work
 ```
 
 ---
