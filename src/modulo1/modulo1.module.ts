@@ -15,12 +15,22 @@ import { Clase02Controller } from './clase02/clase02.controller';
 import { Clase02Service } from './clase02/clase02.service';
 import { Clase03Controller } from './clase03/clase03.controller';
 import { Clase03Service } from './clase03/clase03.service';
+<<<<<<< HEAD
 import { CleanCreditProfile } from '../entities/clean-credit-profile.entity';
 import { GlueJobRunEntity } from '../entities/glue-job-run.entity';
 import { Clase04Controller } from './clase04/clase04.controller';
 import { Clase04Service } from './clase04/clase04.service';
 import { GlueService } from './clase04/glue.service';
 
+=======
+
+import { CleanCreditProfile } from '../entities/clean-credit-profile.entity';
+import { GlueJobRunEntity } from '../entities/glue-job-run.entity';
+import { Clase04Controller } from './clase04/clase04.controller';
+import { Clase04Service } from './clase04/clase04.service';
+import { GlueService } from './clase04/glue.service';
+
+>>>>>>> a7a0c360692570d596842b4048b0ac4da52f8fff
 @Module({
   imports: [
     AuthModule,
@@ -36,7 +46,15 @@ import { GlueService } from './clase04/glue.service';
       GlueJobRunEntity,
     ]),
   ],
+<<<<<<< HEAD
   controllers: [Clase01Controller, Clase02Controller, Clase03Controller, Clase04Controller],
   providers: [Clase01Service, Clase02Service, Clase03Service, TextractService, Clase04Service, GlueService],
 })
 export class Modulo1Module { }
+=======
+  controllers: [Clase01Controller, Clase02Controller, Clase03Controller, Clase04Controller ],
+  providers: [Clase01Service, Clase02Service, Clase03Service, Clase04Service, TextractService, GlueService],
+  exports: [Clase03Service],
+})
+export class Modulo1Module {}
+>>>>>>> a7a0c360692570d596842b4048b0ac4da52f8fff
