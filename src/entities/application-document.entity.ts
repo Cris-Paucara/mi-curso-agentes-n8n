@@ -2,7 +2,6 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeor
 
 @Entity({ name: 'application_documents' })
 export class ApplicationDocument {
-<<<<<<< HEAD
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
@@ -26,7 +25,6 @@ export class ApplicationDocument {
 
     @Column({ name: 'processed_at', type: 'timestamptz', nullable: true })
     processedAt?: Date;
-=======
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -50,5 +48,4 @@ export class ApplicationDocument {
 
   @Column({ name: 'processed_at', type: 'timestamptz', nullable: true })
   processedAt?: Date;
->>>>>>> a7a0c360692570d596842b4048b0ac4da52f8fff
 }
